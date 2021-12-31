@@ -1,6 +1,6 @@
 # pyxtdb
 
-This is a minimal wrapper for the XTDB REST API for Python.
+This is a minimal wrapper for the [XTDB REST API](https://docs.xtdb.com/clients/http/) for Python.
 
 It includes some convenience functions for common DB operations.
 
