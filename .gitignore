@@ -1,2 +1,4 @@
 *.pyc
 __pycache__
+pyxtdb.egg-info/
+dist/

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyxtdb"
+description = "A python client for XTDB"
+version = "0.1.0"
+authors = [
+    {name = "Clark Van Oyen", email = "clark@countable.ca"}
+]
+readme = "README.md"
+requires-python = ">=3.7"
+license = {text = "MIT License"}
+classifiers = [
+    'Development Status :: 3 - Alpha',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: MIT License',
+    'Topic :: Software Development',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Operating System :: OS Independent',
+]
+dependencies = [
+    'requests'
+]
+
+[project.urls]
+homepage = "https://github.com/countable/pyxtdb"
