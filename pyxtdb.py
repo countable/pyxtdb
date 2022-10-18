@@ -151,12 +151,24 @@ class Node:
         op.evict(eid)
         return self.submitTx(transaction)
 
-    def query(self, query, **kwargs):
-        query=query.strip()
-        # basic syntax check
-        assert query.startswith("{") and query.endswith("}")
+    def query(self, query=None, in_args=None, **kwargs):
 
+        # handle explicit query string and in-args, if provided
+        if query:
+            query=query.strip()
+            assert query.startswith("{") and query.endswith("}")
+            if not in_args:
+                data = "{:query %s}" % query
+            else:
+                data = "{:query %s :in-args %s}" % (query, in_args)
+        else:
+            data = None
+
+        # handle url parameters
         known_args = [
+            'query_edn',
+            'in_args_edn',
+            'in_args_json',
             "valid_time",
             'tx_time',
             'tx_id'
@@ -166,8 +178,8 @@ class Node:
         action = "query"
         endpoint = "{}/_xtdb/{}".format(self.uri, action)
         headers = {"Accept": "application/json", "Content-Type": "application/edn"}
-        query = "{:query %s}" % query
-        rsp = requests.post(endpoint, headers=headers, data=query, params=params)
+        rsp = requests.post(endpoint, headers=headers, data=data, params=params)
+        rsp.raise_for_status()
         return rsp.json()
 
     def status(self):
