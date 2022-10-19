@@ -1,5 +1,7 @@
 from enum import Enum
 import json
+
+import edn_format
 import requests
 
 
@@ -106,10 +108,20 @@ class Node:
     def parse_kwargs(self, known_args, provided_args):
         params = {}
         for k,v in provided_args.items():
+            # convert from valid python keywords to url parameters,
+            # i.e. from 'with_opsQ' to 'with-ops?'
+            k = k.replace("_","-").replace('Q','?')
             if k not in known_args:
                 raise UnknownParameter(f'Unknown parameter: {k}')
             if v is not None:
-                params[k.replace("_","-").replace('Q','?')] = v
+                # handle formatted values if they are edn or json,
+                # and for now we depend on the convention that
+                # the url parameters are named with the desired format.
+                if k.endswith('-edn'):
+                    v = edn_format.dumps(v)
+                if k.endswith('-json'):
+                    v = json.dumps(v)
+                params[k] = v
         return params
 
     def call_rest_api(self, action, params={}):
@@ -160,18 +172,18 @@ class Node:
             if not in_args:
                 data = "{:query %s}" % query
             else:
-                data = "{:query %s :in-args %s}" % (query, in_args)
+                data = "{:query %s :in-args %s}" % (query, edn_format.dumps(in_args))
         else:
             data = None
 
         # handle url parameters
         known_args = [
-            'query_edn',
-            'in_args_edn',
-            'in_args_json',
-            "valid_time",
-            'tx_time',
-            'tx_id'
+            'query-edn',
+            'in-args-edn',
+            'in-args-json',
+            "valid-time",
+            'tx-time',
+            'tx-id'
         ]
         params = self.parse_kwargs(known_args, kwargs)
 
@@ -190,11 +202,11 @@ class Node:
         action = "entity"
         known_args = [
             'eid',
-            'eid_json',
-            'eid_edn',
-            'valid_time',
-            'tx_time',
-            'tx_id'
+            'eid-json',
+            'eid-edn',
+            'valid-time',
+            'tx-time',
+            'tx-id'
         ]
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
@@ -203,17 +215,17 @@ class Node:
         action = "entity?history=true"
         known_args = [
             'eid',
-            'eid_json',
-            'eid_edn',
-            'sort_order',
-            'with_corrections',
-            'with_docs',
-            'start_valid_time',
-            'start_tx_time',
-            'start_tx_id',
-            'end_valid_time',
-            'end_tx_time',
-            'end_tx_id'
+            'eid-json',
+            'eid-edn',
+            'sort-order',
+            'with-corrections',
+            'with-docs',
+            'start-valid-time',
+            'start-tx-time',
+            'start-tx-id',
+            'end-valid-time',
+            'end-tx-time',
+            'end-tx-id'
         ]
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
@@ -224,11 +236,11 @@ class Node:
         action = "entity-tx"
         known_args = [
             'eid',
-            'eid_json',
-            'eid_edn',
-            'valid_time',
-            'tx_time',
-            'tx_id'
+            'eid-json',
+            'eid-edn',
+            'valid-time',
+            'tx-time',
+            'tx-id'
         ]
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
@@ -245,25 +257,25 @@ class Node:
 
     def awaitTx(self, **kwargs):
         action = "await-tx"
-        known_args = ['tx_id', 'timeout']
+        known_args = ['tx-id', 'timeout']
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
 
     def awaitTxTime(self, **kwargs):
         action = "await-tx-time"
-        known_args = ['tx_time', 'timeout']
+        known_args = ['tx-time', 'timeout']
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
 
     def txLog(self, **kwargs):
         action = "tx-log"
-        known_args = ['after_tx_id', 'with_opsQ']
+        known_args = ['after-tx-id', 'with-ops?']
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
 
     def txCommitted(self, **kwargs):
         action = "tx-committed"
-        known_args = ['tx_id']
+        known_args = ['tx-id']
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
 
