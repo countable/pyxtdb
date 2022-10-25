@@ -67,33 +67,71 @@ class Query:
 
 class TxOps:
 
-    def __init__(self):
-        self.ops = []
+    def __init__(self, uri="http://localhost:3000", node=None):
+        if node:
+            self.node = node
+        else:
+            self.node = Node(uri)
+        self._ops = []
+        self._result = None
 
-    def put(self, rec, valid_time=None, end_valid_time=None):
+    def _put_single(self, rec, valid_time=None, end_valid_time=None):
         op = ['put', rec]
         if valid_time:
             op.append(valid_time)
         if valid_time and end_valid_time:
             op.append(end_valid_time)
-        self.ops.append(op)
+        self._ops.append(op)
 
-    def delete(self, eid, valid_time=None, end_valid_time=None):
+    def put(self, rec, valid_time=None, end_valid_time=None):
+        if type(rec) is list:
+            for item in rec:
+                self._put_single(item, valid_time, end_valid_time)
+        else:
+            self._put_single(rec, valid_time, end_valid_time)
+        return self
+
+    def _delete_single(self, eid, valid_time=None, end_valid_time=None):
         op = ['delete', eid]
         if valid_time:
             op.append(valid_time)
         if valid_time and end_valid_time:
             op.append(end_valid_time)
-        self.ops.append(op)
+        self._ops.append(op)
+
+    def delete(self, eid, valid_time=None, end_valid_time=None):
+        if type(eid) is list:
+            for item in eid:
+                self._delete_single(item, valid_time, end_valid_time)
+        else:
+            self._delete_single(eid, valid_time, end_valid_time)
+        return self
 
     def evict(self, eid):
-        self.ops.append(['evict', eid])
+        if type(eid) is list:
+            for item in eid:
+                self._ops.append(['evict', item])
+        else:
+            self._ops.append(['evict', eid])
+        return self
 
-    def match(self, eid, rec, ops, valid_time=None):
-        self.ops.append(['match', eid, rec, ops])
+    def match(self, eid, rec, valid_time=None):
+        op = ['match', eid, rec]
+        if valid_time:
+            op.append(valid_time)
+        self._ops.append(op)
+        return self
 
-    def get_all(self):
-        return {'tx-ops': self.ops}
+    def submit(self):
+        if len(self._ops) == 0:
+            return None
+        if not self._result:
+            self._result = self.node.submitTx(self)
+        return self._result
+
+    @property
+    def ops(self):
+        return {'tx-ops': self._ops}
 
 
 class Node:
@@ -102,7 +140,6 @@ class Node:
         self.uri = uri
 
     def find(self, find_clause):
-
         return Query(node=self).find(find_clause)
 
     def parse_kwargs(self, known_args, provided_args):
@@ -144,24 +181,21 @@ class Node:
             "Content-Type": "application/json; charset=utf-8",
             "Accept": "application/json",
         }
-        rsp = requests.post(endpoint, headers=headers, json=txops.get_all())
+        rsp = requests.post(endpoint, headers=headers, json=txops.ops)
         rsp.raise_for_status()
         return rsp.json()
 
     def put(self, rec, valid_time=None, end_valid_time=None):
-        op = TxOps()
-        op.put(rec, valid_time, end_valid_time)
-        return self.submitTx(op)
+        return TxOps(node=self).put(rec, valid_time, end_valid_time)
 
     def delete(self, eid, valid_time=None, end_valid_time=None):
-        op = TxOps()
-        op.delete(eid, valid_time, end_valid_time)
-        return self.submitTx(op)
+        return TxOps(node=self).delete(eid, valid_time, end_valid_time)
 
     def evict(self, eid):
-        op = TxOps()
-        op.evict(eid)
-        return self.submitTx(transaction)
+        return TxOps(node=self).evict(eid)
+
+    def match(self, eid, rec, valid_time=None):
+        return TxOps(node=self).match(eid, rec, valid_time)
 
     def query(self, query=None, in_args=None, **kwargs):
 
@@ -229,8 +263,6 @@ class Node:
         ]
         params = self.parse_kwargs(known_args, kwargs)
         return self.call_rest_api(action, params)
-
-    # -- TODO: explicit optional params for these, as named Python kwargs.
 
     def entityTx(self, **kwargs):
         action = "entity-tx"
