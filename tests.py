@@ -2,7 +2,6 @@ import json
 import pytest
 import os
 import pyxtdb
-import requests
 import edn_format
 
 XTDB_URL = os.environ.get('XTDB_URL', 'http://localhost:3000')
@@ -45,6 +44,22 @@ def test_put_and_query(billies_db):
     result = node.query(r'{:find [?e], :where [[?e :xt/id]]}')
     # None should have xt/id "billy"
     assert billies(result) == 0
+
+def test_bad_query_inputs(billies_db):
+    node = billies_db
+
+    with pytest.raises(pyxtdb.BadEDNString) as e:
+        result = node.query(query='{')            # brace not closed
+    assert 'EOF Reached' in str(e)
+
+    with pytest.raises(pyxtdb.BadEDNString) as e:
+        result = node.query(query='{:find [?e] :where [[?e :xt/id]]}',
+                            in_args='[1]]')      # too many right brackets
+    assert 'VECTOR_END' in str(e)
+
+    with pytest.raises(pyxtdb.XtdbError) as e:
+        result = node.query(query='{:find [?e]} :where [bogus]')
+    assert "Client Error" in str(e)
 
 def test_query_with_args(billies_db):
     node = billies_db
@@ -117,31 +132,31 @@ def test_query_model(billies_db):
     assert len(list(result)) == 1
     assert result.error == None
 
-def test_kwargs(node):
+def test_kwargs():
 
     known_args = ['my-foo', 'my-bar?', 'my-json', 'my-edn']
 
     # confirm keyword underscores become hyphens
-    params = node.parse_kwargs(known_args, {'my_foo': 1})
+    params = pyxtdb.Node._parse_kwargs(known_args, {'my_foo': 1})
     assert 'my-foo' in params
     assert params['my-foo'] == 1
 
     # confirm keyword Qs become ?s
-    params = node.parse_kwargs(known_args, {'my_barQ': 1})
+    params = pyxtdb.Node._parse_kwargs(known_args, {'my_barQ': 1})
     assert 'my-bar?' in params
     assert params['my-bar?'] == 1
 
     # raise exception if keyword not in known_args
     with pytest.raises(pyxtdb.UnknownParameter) as e:
-        params = node.parse_kwargs(known_args, {'unknown': 'xyzzy'})
+        params = pyxtdb.Node._parse_kwargs(known_args, {'unknown': 'xyzzy'})
     assert 'Unknown parameter: unknown' in str(e.value)
 
     # automatic json conversion for keywords ending -json
-    params = node.parse_kwargs(known_args, {'my_json': {'a': 1}})
+    params = pyxtdb.Node._parse_kwargs(known_args, {'my_json': {'a': 1}})
     assert params['my-json'] == '{"a": 1}'
 
     # automatic edn conversion for keywords ending -edn
-    params = node.parse_kwargs(known_args, {'my_edn': {'a': 1}})
+    params = pyxtdb.Node._parse_kwargs(known_args, {'my_edn': {'a': 1}})
     assert params['my-edn'] == '{"a" 1}'
 
 def test_txops(node):
@@ -169,7 +184,7 @@ def test_txops(node):
     records = [x[0] for x in result]
 
     # malformed records
-    with pytest.raises(requests.exceptions.HTTPError) as e:
+    with pytest.raises(pyxtdb.XtdbError) as e:
         result = node.put({'malformed': 'this has no xt/id'}).submit()
 
     # delete one record

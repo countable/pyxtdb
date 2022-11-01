@@ -8,11 +8,23 @@ import requests
 class AlreadySent(Exception):
     pass
 
+class BadEDNString(Exception):
+    pass
+
+class BadQuery(Exception):
+    pass
+
 class MissingParameter(Exception):
     pass
 
 class UnknownParameter(Exception):
     pass
+
+class XtdbError(Exception):
+    def __init__(self, desc, code):
+        super().__init__(f'XtdbError({code}): {desc}')
+        self.description = desc
+        self.status_code = code
 
 class Query:
     def __init__(self, uri="http://localhost:3000", node=None):
@@ -39,7 +51,7 @@ class Query:
 
     def values(self):
         if not self._where_clauses:
-            raise Exception("No Where Clause")
+            raise BadQuery("No Where Clause")
         _query = """
         {
             :find [%s]
@@ -142,7 +154,8 @@ class Node:
     def find(self, find_clause):
         return Query(node=self).find(find_clause)
 
-    def parse_kwargs(self, known_args, provided_args):
+    @staticmethod
+    def _parse_kwargs(known_args, provided_args):
         params = {}
         for k,v in provided_args.items():
             # convert from valid python keywords to url parameters,
@@ -161,17 +174,28 @@ class Node:
                 params[k] = v
         return params
 
-    def call_rest_api(self, action, params={}):
+    @staticmethod
+    def _check_status(request):
+        if 400 <= request.status_code < 500:
+            raise XtdbError(
+                f"Client Error: {request.reason} for url: {request.url}",
+                request.status_code
+            )
+        elif 500 <= request.status_code < 600:
+            raise XtdbError(
+                f"Server Error: {request.reason} for url: {request.url}",
+                request.status_code
+            )
 
+    def _call_rest_api(self, action, params={}):
         endpoint = "{}/_xtdb/{}".format(self.uri, action)
-
         headers = {
             "Content-Type": "application/json; charset=utf-8",
             "Accept": "application/json",
         }
 
         rsp = requests.get(endpoint, headers=headers, params=params)
-        rsp.raise_for_status()
+        self._check_status(rsp)
         return rsp.json()
 
     def submitTx(self, txops):
@@ -182,7 +206,7 @@ class Node:
             "Accept": "application/json",
         }
         rsp = requests.post(endpoint, headers=headers, json=txops.ops)
-        rsp.raise_for_status()
+        self._check_status(rsp)
         return rsp.json()
 
     def put(self, rec, valid_time=None, end_valid_time=None):
@@ -200,14 +224,21 @@ class Node:
     def query(self, query, in_args=None, **kwargs):
 
         if type(query) is str:
-            query = query.strip()
-            assert query.startswith("{") and query.endswith("}")
+            try: # use edn_format to validate the string
+                query = query.strip()
+                _ = edn_format.loads(query)
+            except edn_format.exceptions.EDNDecodeError as e:
+                raise BadEDNString(str(e)) from e
         else:
             query = edn_format.dumps(query)
 
         if in_args is not None:
             if type(in_args) is str:
-                in_args = in_args.strip()
+                try: # use edn_format to validate the string
+                    in_args = in_args.strip()
+                    _ = edn_format.loads(in_args)
+                except edn_format.exceptions.EDNDecodeError as e:
+                    raise BadEDNString(str(e)) from e
             else:
                 in_args = edn_format.dumps(in_args)
 
@@ -222,20 +253,18 @@ class Node:
             'tx-time',
             'tx-id'
         ]
-        params = self.parse_kwargs(known_args, kwargs)
-
-        print(f'params {params}\ndata {data}')
+        params = self._parse_kwargs(known_args, kwargs)
 
         action = "query"
         endpoint = "{}/_xtdb/{}".format(self.uri, action)
         headers = {"Accept": "application/json", "Content-Type": "application/edn"}
         rsp = requests.post(endpoint, headers=headers, data=data, params=params)
-        rsp.raise_for_status()
+        self._check_status(rsp)
         return rsp.json()
 
     def status(self):
         action = "status"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
 
     def entity(self, **kwargs):
         action = "entity"
@@ -247,8 +276,8 @@ class Node:
             'tx-time',
             'tx-id'
         ]
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def entityHistory(self, **kwargs):
         action = "entity?history=true"
@@ -266,8 +295,8 @@ class Node:
             'end-tx-time',
             'end-tx-id'
         ]
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def entityTx(self, **kwargs):
         action = "entity-tx"
@@ -279,59 +308,59 @@ class Node:
             'tx-time',
             'tx-id'
         ]
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def attributeStats(self):
         action = "attribute-stats"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
 
     def sync(self, **kwargs):
         action = "sync"
         known_args = ['timeout']
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def awaitTx(self, **kwargs):
         action = "await-tx"
         known_args = ['tx-id', 'timeout']
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def awaitTxTime(self, **kwargs):
         action = "await-tx-time"
         known_args = ['tx-time', 'timeout']
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def txLog(self, **kwargs):
         action = "tx-log"
         known_args = ['after-tx-id', 'with-ops?']
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def txCommitted(self, **kwargs):
         action = "tx-committed"
         known_args = ['tx-id']
-        params = self.parse_kwargs(known_args, kwargs)
-        return self.call_rest_api(action, params)
+        params = self._parse_kwargs(known_args, kwargs)
+        return self._call_rest_api(action, params)
 
     def latestCompletedTx(self):
         action = "latest-completed-tx"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
 
     def latestSubmittedTx(self):
         action = "latest-submitted-tx"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
 
     def activeQueries(self):
         action = "active-queries"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
 
     def recentQueries(self):
         action = "recent-queries"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
 
     def slowestQueries(self):
         action = "slowest-queries"
-        return self.call_rest_api(action)
+        return self._call_rest_api(action)
