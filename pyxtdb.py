@@ -197,29 +197,34 @@ class Node:
     def match(self, eid, rec, valid_time=None):
         return TxOps(node=self).match(eid, rec, valid_time)
 
-    def query(self, query=None, in_args=None, **kwargs):
+    def query(self, query, in_args=None, **kwargs):
 
-        # handle explicit query string and in-args, if provided
-        if query:
-            query=query.strip()
+        if type(query) is str:
+            query = query.strip()
             assert query.startswith("{") and query.endswith("}")
-            if not in_args:
-                data = "{:query %s}" % query
-            else:
-                data = "{:query %s :in-args %s}" % (query, edn_format.dumps(in_args))
         else:
-            data = None
+            query = edn_format.dumps(query)
+
+        if in_args is not None:
+            if type(in_args) is str:
+                in_args = in_args.strip()
+            else:
+                in_args = edn_format.dumps(in_args)
+
+        if not in_args:
+            data = "{:query %s}" % query
+        else:
+            data = "{:query %s :in-args %s}" % (query, in_args)
 
         # handle url parameters
         known_args = [
-            'query-edn',
-            'in-args-edn',
-            'in-args-json',
             "valid-time",
             'tx-time',
             'tx-id'
         ]
         params = self.parse_kwargs(known_args, kwargs)
+
+        print(f'params {params}\ndata {data}')
 
         action = "query"
         endpoint = "{}/_xtdb/{}".format(self.uri, action)
