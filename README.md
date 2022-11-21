@@ -26,6 +26,16 @@ python
 [['billy']]
 ```
 
+"Fluent API"
+```
+node.put(x).put(y).evict(z).submit()
+```
+
+"bulk api"
+```
+node.put([x1 x2 x3]).submit()
+```
+
 ## Tests
 
 To run the tests, xtdb must be running as above, and you should install `pytest`
