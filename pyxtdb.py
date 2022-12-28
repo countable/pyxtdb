@@ -169,7 +169,9 @@ class Query:
         return result
 
     def __str__(self):
-        return edn_format.dumps(self.query())
+        v = {Keyword('query'): self.query(),
+             Keyword('in-args'): self._in_args}
+        return edn_format.dumps(v)
 
     def __iter__(self):
         self._values = self.values()

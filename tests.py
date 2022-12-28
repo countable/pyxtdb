@@ -121,7 +121,7 @@ def test_query_model_strings(billies_db):
 
     # scalar argument
     result = node.find('?e').where('?e :last-name last').in_('last').in_args('Joel')
-    assert str(result) == '{:find [?e] :where [[?e :last-name last]] :in [last]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :last-name last]] :in [last]} :in-args ["Joel"]}'
     assert len(list(result)) == 1
 
     # multiple scalars
@@ -130,7 +130,7 @@ def test_query_model_strings(billies_db):
                  .where('?e :last-name last') \
                  .in_('first last') \
                  .in_args('Billy', 'Joel')
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last]] :in [first last]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last]] :in [first last]} :in-args ["Billy" "Joel"]}'
     assert len(list(result)) == 1
 
     # tuple
@@ -139,7 +139,7 @@ def test_query_model_strings(billies_db):
                  .where('?e :last-name last') \
                  .in_('[first last]') \
                  .in_args(['Billy', 'Joel'])
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[first last]]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[first last]]} :in-args [["Billy" "Joel"]]}'
     assert len(list(result)) == 1
 
     # tuple and scalar
@@ -149,7 +149,7 @@ def test_query_model_strings(billies_db):
                  .where('?e :profession job') \
                  .in_('[first last] job') \
                  .in_args(['Billy', 'Joel'], 'singer')
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last] [?e :profession job]] :in [[first last] job]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last] [?e :profession job]] :in [[first last] job]} :in-args [["Billy" "Joel"] "singer"]}'
     assert len(list(result)) == 1
 
     # collection
@@ -158,7 +158,7 @@ def test_query_model_strings(billies_db):
                  .where('?e :last-name last') \
                  .in_('[[first last]]') \
                  .in_args([['Billy', 'Joel'], ['Billy', 'Idol']])
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[[first last]]]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[[first last]]]} :in-args [[["Billy" "Joel"] ["Billy" "Idol"]]]}'
     assert len(list(result)) == 2
 
 def test_query_model_edn(billies_db):
@@ -169,7 +169,7 @@ def test_query_model_edn(billies_db):
                  .where(Symbol('?e'), Keyword('last-name'), Symbol('last')) \
                  .in_(Symbol('last')) \
                  .in_args('Joel')
-    assert str(result) == '{:find [?e] :where [[?e :last-name last]] :in [last]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :last-name last]] :in [last]} :in-args ["Joel"]}'
     assert len(list(result)) == 1
 
     # multiple scalars
@@ -178,7 +178,7 @@ def test_query_model_edn(billies_db):
                  .where(Symbol('?e'), Keyword('last-name'), Symbol('last')) \
                  .in_(Symbol('first'), Symbol('last')) \
                  .in_args('Billy', 'Joel')
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last]] :in [first last]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last]] :in [first last]} :in-args ["Billy" "Joel"]}'
     assert len(list(result)) == 1
 
     # tuple
@@ -187,7 +187,7 @@ def test_query_model_edn(billies_db):
                  .where(Symbol('?e'), Keyword('last-name'), Symbol('last')) \
                  .in_([Symbol('first'), Symbol('last')]) \
                  .in_args(['Billy', 'Joel'])
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[first last]]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[first last]]} :in-args [["Billy" "Joel"]]}'
     assert len(list(result)) == 1
 
     # tuple and scalar
@@ -197,7 +197,7 @@ def test_query_model_edn(billies_db):
                  .where(Symbol('?e'), Keyword('profession'), Symbol('job')) \
                  .in_([Symbol('first'), Symbol('last')], Symbol('job')) \
                  .in_args(['Billy', 'Joel'], 'singer')
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last] [?e :profession job]] :in [[first last] job]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last] [?e :profession job]] :in [[first last] job]} :in-args [["Billy" "Joel"] "singer"]}'
     assert len(list(result)) == 1
 
     # collection
@@ -206,7 +206,7 @@ def test_query_model_edn(billies_db):
                  .where(Symbol('?e'), Keyword('last-name'), Symbol('last')) \
                  .in_([[Symbol('first'), Symbol('last')]]) \
                  .in_args([['Billy', 'Joel'], ['Billy', 'Idol']])
-    assert str(result) == '{:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[[first last]]]}'
+    assert str(result) == '{:query {:find [?e] :where [[?e :name first] [?e :last-name last]] :in [[[first last]]]} :in-args [[["Billy" "Joel"] ["Billy" "Idol"]]]}'
     assert len(list(result)) == 2
 
 def test_kwargs():
