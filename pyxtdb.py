@@ -26,6 +26,18 @@ class XtdbError(Exception):
         self.description = desc
         self.status_code = code
 
+
+# Query Builder
+
+class Symbol(edn_format.Symbol):
+    pass
+
+class Keyword(edn_format.Keyword):
+    pass
+
+class Char(edn_format.Char):
+    pass
+
 class Query:
     def __init__(self, uri="http://localhost:3000", node=None):
         if node:
@@ -33,39 +45,133 @@ class Query:
         else:
             self.node = Node(uri)
         self._find_clause = None
+        self._in_clause = None
         self._where_clauses = []
+        self._rules_clauses = []
+        self._order_by_clauses = []
+        self._limit = None
+        self._offset = None
         self._values = None
+        self._timeout = None
+        self._in_args = None
         self.error = None
     
-    def find(self, clause):
+    def find(self, *args):
         if self._values:
             raise AlreadySent()
-        self._find_clause = clause
+        if len(args) == 0:
+            raise ValueError('missing find arguments')
+        if len(args) == 1 and type(args[0]) == str:
+            self._find_clause = edn_format.loads('['+args[0]+']')
+        else:
+            self._find_clause = list(args)
         return self
 
-    def where(self, clause):
+    def in_(self, *args):
         if self._values:
             raise AlreadySent()
-        self._where_clauses.append(clause)
+        if len(args) == 0:
+            raise ValueError('missing in arguments')
+        if len(args) == 1 and type(args[0]) == str:
+            self._in_clause = edn_format.loads('['+args[0]+']')
+        else:
+            self._in_clause = list(args)
         return self
+
+    def where(self, *args):
+        if self._values:
+            raise AlreadySent()
+        if len(args) == 0:
+            raise ValueError('missing where arguments')
+        if len(args) == 1 and type(args[0]) == str:
+            self._where_clauses.append(edn_format.loads('['+args[0]+']'))
+        else:
+            self._where_clauses.append(list(args))
+        return self
+
+    def rules(self, *args):
+        if self._values:
+            raise AlreadySent()
+        if len(args) == 0:
+            raise ValueError('missing rules arguments')
+        if len(args) == 1 and type(args[0]) == str:
+            self._rules_clauses.append(edn_format.loads('['+args[0]+']'))
+        else:
+            self._rules_clauses.append(list(args))
+        return self
+
+    def order_by(self, *args):
+        if self._values:
+            raise AlreadySent()
+        if len(args) == 0:
+            raise ValueError('missing order_by arguments')
+        if len(args) == 1 and type(args[0]) == str:
+            self._order_by_clauses.append(edn_format.loads('['+args[0]+']'))
+        else:
+            self._order_by_clauses.append(list(args))
+        return self
+
+    def limit(self, limit):
+        if self._values:
+            raise AlreadySent()
+        self._limit = limit
+        return self
+
+    def offset(self, offset):
+        if self._values:
+            raise AlreadySent()
+        self._offset = offset
+        return self
+
+    def timeout(self, timeout):
+        if self._values:
+            raise AlreadySent()
+        self._timeout = timeout
+        return self
+
+    def in_args(self, *args):
+        if self._values:
+            raise AlreadySent()
+        if len(args) == 0:
+            raise ValueError('missing in-args arguments')
+        self._in_args = list(args)
+        return self
+
+    def query(self):
+        q = {
+            Keyword('find'):  self._find_clause,
+            Keyword('where'): self._where_clauses
+        }
+        if self._in_clause:
+            q[Keyword('in')] = self._in_clause
+        if self._rules_clauses:
+            q[Keyword('rules')] = self._rules_clauses
+        if self._order_by_clauses:
+            q[Keyword('order-by')] = self._order_by_clauses
+        if self._limit:
+            q[Keyword('limit')] = self._limit
+        if self._offset:
+            q[Keyword('offset')] = self._offset
+        if self._timeout:
+            q[Keyword('timeout')] = self._timeout
+        return q
 
     def values(self):
+        if not self._find_clause:
+            raise BadQuery("query has no find clause")
         if not self._where_clauses:
-            raise BadQuery("No Where Clause")
-        _query = """
-        {
-            :find [%s]
-            :where [
-                [%s]
-            ]
-        }
-        """ % (self._find_clause, ']\n['.join(self._where_clauses))
-       
-        result = self.node.query(_query)
+            raise BadQuery("query has no where clause")
+        query = self.query()
+        result = self.node.query(query, in_args=self._in_args)
         if type(result) is dict:
             self.error = json.dumps(result, indent=4, sort_keys=True)
             return []
         return result
+
+    def __str__(self):
+        v = {Keyword('query'): self.query(),
+             Keyword('in-args'): self._in_args}
+        return edn_format.dumps(v)
 
     def __iter__(self):
         self._values = self.values()
