@@ -53,6 +53,7 @@ class Query:
         self._offset = None
         self._values = None
         self._timeout = None
+        self._in_args = None
         self.error = None
     
     def find(self, *args):
@@ -63,7 +64,7 @@ class Query:
         if len(args) == 1 and type(args[0]) == str:
             self._find_clause = edn_format.loads('['+args[0]+']')
         else:
-            self._find_clause = args
+            self._find_clause = list(args)
         return self
 
     def in_(self, *args):
@@ -74,7 +75,7 @@ class Query:
         if len(args) == 1 and type(args[0]) == str:
             self._in_clause = edn_format.loads('['+args[0]+']')
         else:
-            self._in_clause = args
+            self._in_clause = list(args)
         return self
 
     def where(self, *args):
@@ -128,6 +129,14 @@ class Query:
         self._timeout = timeout
         return self
 
+    def in_args(self, *args):
+        if self._values:
+            raise AlreadySent()
+        if len(args) == 0:
+            raise ValueError('missing in-args arguments')
+        self._in_args = list(args)
+        return self
+
     def query(self):
         q = {
             Keyword('find'):  self._find_clause,
@@ -153,14 +162,14 @@ class Query:
         if not self._where_clauses:
             raise BadQuery("query has no where clause")
         query = self.query()
-        result = self.node.query(query)
+        result = self.node.query(query, in_args=self._in_args)
         if type(result) is dict:
             self.error = json.dumps(result, indent=4, sort_keys=True)
             return []
         return result
 
     def __str__(self):
-        return edn_format.dumps(self.query(), indent=4)
+        return edn_format.dumps(self.query())
 
     def __iter__(self):
         self._values = self.values()
